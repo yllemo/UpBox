@@ -3,7 +3,7 @@ session_start();
 
 // Configuration
 $password = 'admin123'; // Change this password
-$contentDir = 'content/';
+$contentDir = __DIR__ . '/content/';
 $allowedExtensions = ['html', 'svg', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'md', 'txt'];
 $maxFileSize = 10 * 1024 * 1024; // 10MB
 
@@ -28,10 +28,39 @@ if (isset($_GET['logout'])) {
     exit;
 }
 
+// Handle file deletion
+if (isset($_POST['delete']) && isset($_SESSION['logged_in'])) {
+    $deleteSuccess = false;
+    $deleteError = '';
+    
+    if (isset($_POST['filename']) && !empty($_POST['filename'])) {
+        $filename = $_POST['filename'];
+        
+        // Security: Only allow deletion of files in content directory
+        // Prevent directory traversal attacks
+        $safeName = basename($filename);
+        $filePath = $contentDir . $safeName;
+        
+        // Check if file exists and is within content directory
+        if (file_exists($filePath) && strpos(realpath($filePath), realpath($contentDir)) === 0) {
+            if (unlink($filePath)) {
+                $deleteSuccess = true;
+            } else {
+                $deleteError = 'Failed to delete file';
+            }
+        } else {
+            $deleteError = 'File not found or access denied';
+        }
+    } else {
+        $deleteError = 'No filename specified';
+    }
+}
+
 // Handle file upload
 if (isset($_POST['upload']) && isset($_SESSION['logged_in'])) {
     $uploadSuccess = false;
     $uploadError = '';
+    
     
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
         $fileName = $_FILES['file']['name'];
@@ -121,8 +150,21 @@ function getFileIcon($extension) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Upload Tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>UpBox - File Upload Tool</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="favicon-simple.svg" sizes="16x16">
+    <link rel="shortcut icon" href="favicon-simple.svg">
+    <link rel="apple-touch-icon" href="favicon.svg">
+    
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -167,6 +209,16 @@ function getFileIcon($extension) {
                     <div class="error"><?php echo htmlspecialchars($uploadError); ?></div>
                 <?php endif; ?>
                 
+                <?php if (isset($deleteSuccess) && $deleteSuccess): ?>
+                    <div class="success">File deleted successfully!</div>
+                <?php endif; ?>
+                
+                <?php if (isset($deleteError) && $deleteError): ?>
+                    <div class="error"><?php echo htmlspecialchars($deleteError); ?></div>
+                <?php endif; ?>
+                
+                
+                
                 <form method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
                     <div class="file-input-wrapper">
                         <input type="file" name="file" id="fileInput" accept=".html,.svg,.jpg,.jpeg,.png,.gif,.webp,.md,.txt" required>
@@ -193,7 +245,7 @@ function getFileIcon($extension) {
                             <div class="file-item">
                                 <div class="file-icon"><?php echo getFileIcon($file['extension']); ?></div>
                                 <div class="file-info">
-                                    <a href="<?php echo $contentDir . htmlspecialchars($file['name']); ?>" 
+                                    <a href="<?php echo 'content/' . htmlspecialchars($file['name']); ?>" 
                                        target="_blank" class="file-name">
                                         <?php echo htmlspecialchars($file['name']); ?>
                                     </a>
@@ -201,6 +253,12 @@ function getFileIcon($extension) {
                                         <span class="file-size"><?php echo formatFileSize($file['size']); ?></span>
                                         <span class="file-date"><?php echo date('M j, Y H:i', $file['modified']); ?></span>
                                     </div>
+                                </div>
+                                <div class="file-actions">
+                                    <form method="post" class="delete-form" style="display: inline;" onsubmit="return confirmDelete('<?php echo htmlspecialchars($file['name'], ENT_QUOTES); ?>')">
+                                        <input type="hidden" name="filename" value="<?php echo htmlspecialchars($file['name']); ?>">
+                                        <button type="submit" name="delete" class="delete-btn" title="Delete file">🗑️</button>
+                                    </form>
                                 </div>
                             </div>
                         <?php endforeach; ?>

@@ -16,9 +16,22 @@ document.addEventListener('DOMContentLoaded', function() {
         fileInputLabel.addEventListener('drop', handleFileDrop);
     }
     
-    // Form submission handling
+    // Form submission handling - temporarily disabled to test
     if (uploadForm) {
-        uploadForm.addEventListener('submit', handleFormSubmit);
+        console.log('Upload form found, but not adding submit listener to test normal submission');
+        
+        // Just add click listener for debugging
+        const submitButton = uploadForm.querySelector('button[type="submit"]');
+        if (submitButton) {
+            console.log('Submit button found, adding click listener');
+            submitButton.addEventListener('click', function(e) {
+                console.log('Submit button clicked!');
+            });
+        } else {
+            console.error('Submit button NOT found!');
+        }
+    } else {
+        console.error('Upload form NOT found!');
     }
     
     // Auto-hide messages after 5 seconds
@@ -26,6 +39,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add keyboard shortcuts
     addKeyboardShortcuts();
+    
+    // Add clipboard paste functionality - temporarily disabled to test form submission
+    // addClipboardPaste();
+    
+    // Initialize advanced features (moved from second DOMContentLoaded)
+    // Temporarily disabled to test form submission
+    // setupAdvancedDragDrop();
+    addDragDropStyles();
 });
 
 // File selection handler
@@ -104,20 +125,25 @@ function handleFileDrop(event) {
 
 // Form submission handler
 function handleFormSubmit(event) {
+    console.log('Form submission started');
     const submitButton = uploadForm.querySelector('button[type="submit"]');
     
     if (!fileInput.files || fileInput.files.length === 0) {
+        console.log('No file selected, preventing submission');
         event.preventDefault();
         showMessage('Please select a file to upload.', 'error');
         return;
     }
     
+    console.log('File selected:', fileInput.files[0].name, 'Size:', fileInput.files[0].size);
+    
     // Add uploading class for visual feedback
     uploadForm.classList.add('uploading');
     submitButton.disabled = true;
-    submitButton.textContent = 'Uploading';
+    submitButton.textContent = 'Uploading...';
     
     // Note: The actual upload is handled by PHP, so we don't prevent default here
+    console.log('Form will be submitted to server');
 }
 
 // Show message function
@@ -191,6 +217,14 @@ function addKeyboardShortcuts() {
                 fileInput.value = '';
                 resetFileInputDisplay();
                 showMessage('File selection cleared.', 'success');
+            }
+        }
+        
+        // Ctrl/Cmd + V is handled by the paste event listener
+        // But we can focus the upload area when Ctrl+V is pressed
+        if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+            if (fileInputLabel && document.activeElement !== fileInputLabel) {
+                fileInputLabel.focus();
             }
         }
     });
@@ -347,10 +381,10 @@ function validateFile(file) {
 function setupAdvancedDragDrop() {
     if (!fileInputLabel) return;
     
-    // Prevent default drag behaviors
+    // Prevent default drag behaviors only for drag/drop events
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         fileInputLabel.addEventListener(eventName, preventDefaults, false);
-        document.body.addEventListener(eventName, preventDefaults, false);
+        // Remove body-wide preventDefault to avoid interfering with form submission
     });
     
     // Highlight drop area
@@ -400,11 +434,8 @@ function setupAdvancedDragDrop() {
     }
 }
 
-// Initialize advanced features
-document.addEventListener('DOMContentLoaded', function() {
-    setupAdvancedDragDrop();
-    
-    // Add CSS for drag highlight
+// Add CSS for drag highlight and preview (moved to main DOMContentLoaded)
+function addDragDropStyles() {
     const style = document.createElement('style');
     style.textContent = `
         .drag-highlight {
@@ -432,7 +463,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     `;
     document.head.appendChild(style);
-});
+}
 
 // Copy file URL to clipboard functionality
 function copyToClipboard(text) {
@@ -551,3 +582,197 @@ function addSearchFunctionality() {
 
 // Initialize search functionality
 setTimeout(addSearchFunctionality, 100);
+
+// Clipboard paste functionality
+function addClipboardPaste() {
+    // Add paste event listener to the document
+    document.addEventListener('paste', handlePaste);
+    
+    // Also add to the upload area specifically
+    if (fileInputLabel) {
+        fileInputLabel.addEventListener('paste', handlePaste);
+        
+        // Make the upload area focusable for paste events
+        fileInputLabel.setAttribute('tabindex', '0');
+        
+        // Add visual indication that paste is supported
+        const pasteHint = document.createElement('div');
+        pasteHint.className = 'paste-hint';
+        pasteHint.innerHTML = '💼 Drag & drop files here or <strong>Ctrl+V</strong> to paste from clipboard';
+        pasteHint.style.cssText = `
+            font-size: 0.8rem;
+            color: #888;
+            text-align: center;
+            margin-top: 8px;
+            opacity: 0.8;
+        `;
+        
+        // Insert the hint after the file input label
+        fileInputLabel.parentNode.insertBefore(pasteHint, fileInputLabel.nextSibling);
+    }
+}
+
+function handlePaste(event) {
+    // Prevent default paste behavior
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const clipboardData = event.clipboardData || window.clipboardData;
+    
+    if (!clipboardData) {
+        showMessage('Clipboard access not supported in this browser.', 'error');
+        return;
+    }
+    
+    const items = clipboardData.items;
+    let imageFound = false;
+    
+    // Look for image data in clipboard
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        
+        // Check if the item is an image
+        if (item.type.indexOf('image') !== -1) {
+            imageFound = true;
+            const blob = item.getAsFile();
+            
+            if (blob) {
+                // Create a File object from the blob
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const extension = getExtensionFromMimeType(blob.type);
+                const fileName = `pasted-image-${timestamp}.${extension}`;
+                
+                // Create a new File object with proper name
+                const file = new File([blob], fileName, {
+                    type: blob.type,
+                    lastModified: Date.now()
+                });
+                
+                // Validate the file
+                const validation = validateFile(file);
+                if (validation.valid) {
+                    // Create a FileList-like object
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    
+                    // Set the file to the input
+                    if (fileInput) {
+                        fileInput.files = dt.files;
+                        updateFileInputDisplay(file);
+                        previewFile(file);
+                        
+                        showMessage(`Image pasted successfully: ${fileName}`, 'success');
+                        
+                        // Focus the upload area to show it's ready
+                        if (fileInputLabel) {
+                            fileInputLabel.focus();
+                            fileInputLabel.style.borderColor = '#4caf50';
+                            fileInputLabel.style.background = 'rgba(76, 175, 80, 0.1)';
+                            
+                            // Reset border color after a moment
+                            setTimeout(() => {
+                                fileInputLabel.style.borderColor = '';
+                                fileInputLabel.style.background = '';
+                            }, 2000);
+                        }
+                    }
+                } else {
+                    showMessage(`Clipboard image error: ${validation.errors.join(', ')}`, 'error');
+                }
+            }
+            break;
+        }
+    }
+    
+    if (!imageFound) {
+        // Check for files in clipboard (like copied files from file explorer)
+        const files = clipboardData.files;
+        if (files && files.length > 0) {
+            const file = files[0];
+            const validation = validateFile(file);
+            
+            if (validation.valid) {
+                if (fileInput) {
+                    fileInput.files = files;
+                    updateFileInputDisplay(file);
+                    previewFile(file);
+                    showMessage(`File pasted successfully: ${file.name}`, 'success');
+                }
+            } else {
+                showMessage(`Clipboard file error: ${validation.errors.join(', ')}`, 'error');
+            }
+        } else {
+            showMessage('No image or supported file found in clipboard. Try copying an image first.', 'error');
+        }
+    }
+}
+
+// Helper function to get file extension from MIME type
+function getExtensionFromMimeType(mimeType) {
+    const mimeToExt = {
+        'image/png': 'png',
+        'image/jpeg': 'jpg',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'image/svg+xml': 'svg',
+        'text/html': 'html',
+        'text/markdown': 'md',
+        'text/plain': 'txt'
+    };
+    
+    return mimeToExt[mimeType] || 'png'; // Default to PNG for unknown image types
+}
+
+// File deletion confirmation
+function confirmDelete(filename) {
+    const message = `Are you sure you want to delete "${filename}"?\n\nThis action cannot be undone.`;
+    return confirm(message);
+}
+
+// Enhanced delete confirmation with custom dialog
+function showDeleteConfirmation(filename, form) {
+    // Create custom confirmation dialog
+    const overlay = document.createElement('div');
+    overlay.className = 'delete-confirmation-overlay';
+    overlay.innerHTML = `
+        <div class="delete-confirmation-dialog">
+            <div class="delete-confirmation-header">
+                <h3>⚠️ Delete File</h3>
+            </div>
+            <div class="delete-confirmation-content">
+                <p>Are you sure you want to delete:</p>
+                <p class="filename-highlight">${filename}</p>
+                <p class="warning-text">This action cannot be undone.</p>
+            </div>
+            <div class="delete-confirmation-actions">
+                <button class="confirm-delete-btn" onclick="confirmDeleteAction('${filename}', this)">Delete</button>
+                <button class="cancel-delete-btn" onclick="cancelDelete()">Cancel</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    // Store form reference for later use
+    overlay.deleteForm = form;
+    
+    return false; // Prevent form submission
+}
+
+function confirmDeleteAction(filename, button) {
+    const overlay = button.closest('.delete-confirmation-overlay');
+    const form = overlay.deleteForm;
+    
+    // Remove the confirmation dialog
+    overlay.remove();
+    
+    // Submit the form
+    form.submit();
+}
+
+function cancelDelete() {
+    const overlay = document.querySelector('.delete-confirmation-overlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
