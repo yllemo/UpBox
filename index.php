@@ -2,10 +2,35 @@
 session_start();
 
 // Configuration
-$password = 'admin123'; // Change this password
+$configFile = __DIR__ . '/conf/config.json';
 $contentDir = __DIR__ . '/content/';
 $allowedExtensions = ['html', 'svg', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'md', 'txt'];
 $maxFileSize = 10 * 1024 * 1024; // 10MB
+
+// Load configuration
+function loadConfig() {
+    global $configFile;
+    if (file_exists($configFile)) {
+        $config = json_decode(file_get_contents($configFile), true);
+        return $config ? $config : ['password_hash' => password_hash('admin123', PASSWORD_DEFAULT)];
+    }
+    // Create default config if file doesn't exist
+    $defaultConfig = ['password_hash' => password_hash('admin123', PASSWORD_DEFAULT)];
+    saveConfig($defaultConfig);
+    return $defaultConfig;
+}
+
+// Save configuration
+function saveConfig($config) {
+    global $configFile;
+    $confDir = dirname($configFile);
+    if (!file_exists($confDir)) {
+        mkdir($confDir, 0755, true);
+    }
+    file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT));
+}
+
+$config = loadConfig();
 
 // Create content directory if it doesn't exist
 if (!file_exists($contentDir)) {
@@ -14,8 +39,27 @@ if (!file_exists($contentDir)) {
 
 // Handle login
 if (isset($_POST['login'])) {
-    if ($_POST['password'] === $password) {
+    $loginSuccess = false;
+    
+    // Check if using new hash system
+    if (isset($config['password_hash'])) {
+        $loginSuccess = password_verify($_POST['password'], $config['password_hash']);
+    }
+    // Fallback for plain text (temporary)
+    elseif (isset($config['password'])) {
+        if ($_POST['password'] === $config['password']) {
+            $loginSuccess = true;
+            // Upgrade to hash system
+            $config['password_hash'] = password_hash($_POST['password'], PASSWORD_DEFAULT);
+            unset($config['password']);
+            saveConfig($config);
+        }
+    }
+    
+    if ($loginSuccess) {
         $_SESSION['logged_in'] = true;
+        header('Location: index.php');
+        exit;
     } else {
         $error = 'Invalid password';
     }
@@ -30,9 +74,6 @@ if (isset($_GET['logout'])) {
 
 // Handle file deletion
 if (isset($_POST['delete']) && isset($_SESSION['logged_in'])) {
-    $deleteSuccess = false;
-    $deleteError = '';
-    
     if (isset($_POST['filename']) && !empty($_POST['filename'])) {
         $filename = $_POST['filename'];
         
@@ -44,24 +85,55 @@ if (isset($_POST['delete']) && isset($_SESSION['logged_in'])) {
         // Check if file exists and is within content directory
         if (file_exists($filePath) && strpos(realpath($filePath), realpath($contentDir)) === 0) {
             if (unlink($filePath)) {
-                $deleteSuccess = true;
+                $_SESSION['message'] = ['type' => 'success', 'text' => 'File deleted successfully!'];
             } else {
-                $deleteError = 'Failed to delete file';
+                $_SESSION['message'] = ['type' => 'error', 'text' => 'Failed to delete file'];
             }
         } else {
-            $deleteError = 'File not found or access denied';
+            $_SESSION['message'] = ['type' => 'error', 'text' => 'File not found or access denied'];
         }
     } else {
-        $deleteError = 'No filename specified';
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'No filename specified'];
     }
+    header('Location: index.php');
+    exit;
+}
+
+// Handle password change
+if (isset($_POST['change_password']) && isset($_SESSION['logged_in'])) {
+    if (isset($_POST['current_password']) && isset($_POST['new_password']) && isset($_POST['confirm_password'])) {
+        $currentPassword = $_POST['current_password'];
+        $newPassword = $_POST['new_password'];
+        $confirmPassword = $_POST['confirm_password'];
+        
+        // Verify current password
+        if (password_verify($currentPassword, $config['password_hash'])) {
+            // Check if new passwords match
+            if ($newPassword === $confirmPassword) {
+                // Check password length
+                if (strlen($newPassword) >= 6) {
+                    // Update password in config
+                    $config['password_hash'] = password_hash($newPassword, PASSWORD_DEFAULT);
+                    saveConfig($config);
+                    $_SESSION['message'] = ['type' => 'success', 'text' => 'Password changed successfully!'];
+                } else {
+                    $_SESSION['message'] = ['type' => 'error', 'text' => 'New password must be at least 6 characters long'];
+                }
+            } else {
+                $_SESSION['message'] = ['type' => 'error', 'text' => 'New passwords do not match'];
+            }
+        } else {
+            $_SESSION['message'] = ['type' => 'error', 'text' => 'Current password is incorrect'];
+        }
+    } else {
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'All fields are required'];
+    }
+    header('Location: index.php?settings=1');
+    exit;
 }
 
 // Handle file upload
 if (isset($_POST['upload']) && isset($_SESSION['logged_in'])) {
-    $uploadSuccess = false;
-    $uploadError = '';
-    
-    
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
         $fileName = $_FILES['file']['name'];
         $fileSize = $_FILES['file']['size'];
@@ -85,19 +157,21 @@ if (isset($_POST['upload']) && isset($_SESSION['logged_in'])) {
                 }
                 
                 if (move_uploaded_file($fileTmp, $destination)) {
-                    $uploadSuccess = true;
+                    $_SESSION['message'] = ['type' => 'success', 'text' => 'File uploaded successfully!'];
                 } else {
-                    $uploadError = 'Failed to move uploaded file';
+                    $_SESSION['message'] = ['type' => 'error', 'text' => 'Failed to move uploaded file'];
                 }
             } else {
-                $uploadError = 'File size exceeds limit (10MB)';
+                $_SESSION['message'] = ['type' => 'error', 'text' => 'File size exceeds limit (10MB)'];
             }
         } else {
-            $uploadError = 'File type not allowed';
+            $_SESSION['message'] = ['type' => 'error', 'text' => 'File type not allowed'];
         }
     } else {
-        $uploadError = 'No file selected or upload error';
+        $_SESSION['message'] = ['type' => 'error', 'text' => 'No file selected or upload error'];
     }
+    header('Location: index.php');
+    exit;
 }
 
 // Get list of files
@@ -190,9 +264,46 @@ function getFileIcon($extension) {
             <!-- Main Application -->
             <header>
                 <h1>📁 File Upload Tool</h1>
-                <a href="?logout" class="logout-btn">Logout</a>
+                <div class="header-actions">
+                    <a href="?settings=1" class="logout-btn">⚙️ Settings</a>
+                    <a href="?logout" class="logout-btn">Logout</a>
+                </div>
             </header>
             
+            <!-- Messages -->
+            <?php if (isset($_SESSION['message'])): ?>
+                <div class="<?php echo $_SESSION['message']['type']; ?>"><?php echo htmlspecialchars($_SESSION['message']['text']); ?></div>
+                <?php unset($_SESSION['message']); ?>
+            <?php endif; ?>
+            
+            <?php if (isset($_GET['settings'])): ?>
+            <!-- Settings Section -->
+            <div class="password-change-section">
+                <h2>⚙️ Settings</h2>
+                
+                <h3>Change Password</h3>
+                <form method="post" class="password-form">
+                    <div class="form-group">
+                        <label for="current_password">Current Password:</label>
+                        <input type="password" name="current_password" id="current_password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new_password">New Password:</label>
+                        <input type="password" name="new_password" id="new_password" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm New Password:</label>
+                        <input type="password" name="confirm_password" id="confirm_password" required minlength="6">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" name="change_password" class="change-password-btn">Change Password</button>
+                        <a href="index.php" class="cancel-btn">Back to Files</a>
+                    </div>
+                </form>
+            </div>
+            <?php endif; ?>
+            
+            <?php if (!isset($_GET['settings'])): ?>
             <!-- Upload Section -->
             <div class="upload-section">
                 <h2>Upload Files</h2>
@@ -200,24 +311,6 @@ function getFileIcon($extension) {
                     Allowed types: HTML, SVG, Images (JPG, PNG, GIF, WebP), Markdown, Text files<br>
                     Maximum size: 10MB per file
                 </p>
-                
-                <?php if (isset($uploadSuccess) && $uploadSuccess): ?>
-                    <div class="success">File uploaded successfully!</div>
-                <?php endif; ?>
-                
-                <?php if (isset($uploadError) && $uploadError): ?>
-                    <div class="error"><?php echo htmlspecialchars($uploadError); ?></div>
-                <?php endif; ?>
-                
-                <?php if (isset($deleteSuccess) && $deleteSuccess): ?>
-                    <div class="success">File deleted successfully!</div>
-                <?php endif; ?>
-                
-                <?php if (isset($deleteError) && $deleteError): ?>
-                    <div class="error"><?php echo htmlspecialchars($deleteError); ?></div>
-                <?php endif; ?>
-                
-                
                 
                 <form method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
                     <div class="file-input-wrapper">
@@ -265,6 +358,7 @@ function getFileIcon($extension) {
                     </div>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
     

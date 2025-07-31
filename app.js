@@ -47,6 +47,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Temporarily disabled to test form submission
     // setupAdvancedDragDrop();
     addDragDropStyles();
+    
+    // Add settings button click handler as backup
+    const settingsBtn = document.getElementById('toggle-password-form');
+    if (settingsBtn) {
+        console.log('Settings button found, adding click listener');
+        settingsBtn.addEventListener('click', togglePasswordForm);
+    } else {
+        console.log('Settings button not found');
+    }
 });
 
 // File selection handler
@@ -728,6 +737,40 @@ function confirmDelete(filename) {
     const message = `Are you sure you want to delete "${filename}"?\n\nThis action cannot be undone.`;
     return confirm(message);
 }
+
+// Toggle password change form
+function togglePasswordForm() {
+    console.log('Toggle function called'); // Debug log
+    const passwordSection = document.getElementById('password-change-section');
+    
+    if (!passwordSection) {
+        console.error('Password section not found');
+        return;
+    }
+    
+    const isVisible = passwordSection.style.display === 'block';
+    console.log('Current display style:', passwordSection.style.display); // Debug log
+    console.log('Current visibility:', isVisible); // Debug log
+    
+    if (isVisible) {
+        passwordSection.style.display = 'none';
+        // Clear form fields when hiding
+        const form = passwordSection.querySelector('form');
+        if (form) {
+            form.reset();
+        }
+    } else {
+        passwordSection.style.display = 'block';
+        // Focus first input when showing
+        const firstInput = passwordSection.querySelector('input[type="password"]');
+        if (firstInput) {
+            setTimeout(() => firstInput.focus(), 100);
+        }
+    }
+}
+
+// Make sure the function is available globally
+window.togglePasswordForm = togglePasswordForm;
 
 // Enhanced delete confirmation with custom dialog
 function showDeleteConfirmation(filename, form) {

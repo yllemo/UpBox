@@ -876,3 +876,146 @@ header h1 {
         font-size: 1rem;
     }
 }
+
+/* Password Change Styles */
+.header-actions {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.settings-btn {
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #e0e0e0;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.settings-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.password-change-section {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    padding: 30px;
+    margin-bottom: 40px;
+    backdrop-filter: blur(10px);
+}
+
+.password-change-section h3 {
+    color: #64b5f6;
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.password-form .form-group {
+    margin-bottom: 20px;
+}
+
+.password-form label {
+    display: block;
+    color: #b0b0b0;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.password-form input[type="password"] {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.password-form input[type="password"]:focus {
+    outline: none;
+    border-color: #64b5f6;
+    box-shadow: 0 0 10px rgba(100, 181, 246, 0.3);
+}
+
+.form-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 25px;
+}
+
+.change-password-btn {
+    padding: 12px 30px;
+    background: linear-gradient(45deg, #64b5f6, #42a5f5);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.change-password-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(100, 181, 246, 0.4);
+}
+
+.cancel-btn {
+    display: inline-block;
+    padding: 12px 30px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #e0e0e0;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    text-align: center;
+}
+
+.cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+/* Mobile responsive for password form */
+@media (max-width: 768px) {
+    .header-actions {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+        text-align: center;
+    }
+    
+    .settings-btn, .logout-btn {
+        text-align: center;
+        justify-content: center;
+    }
+    
+    .password-change-section {
+        padding: 20px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .change-password-btn, .cancel-btn {
+        width: 100%;
+        padding: 15px;
+        font-size: 16px;
+    }
+}
