@@ -314,7 +314,7 @@ function getFileIcon($extension) {
                 
                 <form method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
                     <div class="file-input-wrapper">
-                        <input type="file" name="file" id="fileInput" accept=".html,.svg,.jpg,.jpeg,.png,.gif,.webp,.md,.txt" required>
+                        <input type="file" name="file" id="fileInput" accept=".html,.svg,.jpg,.jpeg,.png,.gif,.webp,.md,.txt;.json" required>
                         <label for="fileInput" class="file-input-label">
                             <span class="file-input-text">Choose File</span>
                             <span class="file-input-button">Browse</span>
